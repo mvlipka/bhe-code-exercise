@@ -2,11 +2,10 @@ package calculators
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEratosthenesCalculator_GetPrimeAtIndex(t *testing.T) {
@@ -47,6 +46,17 @@ func TestEratosthenesCalculator_GetPrimeAtIndex(t *testing.T) {
 	result, err = sieve.GetPrimeAtIndex(context.Background(), 1000000)
 	require.NoError(t, err)
 	assert.Equal(t, int64(15485867), result)
+}
+
+func TestEratosthenesCalculator_GetPrimeAtIndexTimeout(t *testing.T) {
+	sieve := NewEratosthenesCalculator()
+
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 0)
+	defer cancelFunc()
+
+	_, err := sieve.GetPrimeAtIndex(ctx, 2000)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "context timeout exceeded")
 }
 
 func FuzzEratosthenesCalculator_GetPrimeAtIndex(f *testing.F) {
