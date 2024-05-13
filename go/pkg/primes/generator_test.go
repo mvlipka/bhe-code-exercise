@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"math/big"
+	"strings"
 	"testing"
 )
 
@@ -56,7 +57,7 @@ func TestEratosthenesCalculator_GetPrimeAtIndexTimeout(t *testing.T) {
 	assert.Contains(t, err.Error(), "context timeout exceeded")
 }
 
-func TestEratosthenesCalculator_GetPrimeAtIndexIndexInputErrors(t *testing.T) {
+func TestEratosthenesCalculator_GetPrimeAtIndexInputError(t *testing.T) {
 	mockCalculator := &calculators.MockCalculator{
 		TestGeneratePrimesInRange: func(start, end int64) ([]int64, error) {
 			require.FailNow(t, "this should have been reached")
@@ -67,9 +68,24 @@ func TestEratosthenesCalculator_GetPrimeAtIndexIndexInputErrors(t *testing.T) {
 
 	result, err := generator.GetPrimeAtIndex(context.Background(), int64(-1))
 	require.Error(t, err)
+	assert.Equal(t, result, int64(-1))
 	assert.Contains(t, err.Error(), "index must be a positive number")
+}
 
-	assert.Equal(t, result, int64(0))
+func TestEratosthenesCalculator_GetPrimeAtIndexPrimeGenerationError(t *testing.T) {
+	mockCalculator := &calculators.MockCalculator{
+		TestGeneratePrimesInRange: func(start, end int64) ([]int64, error) {
+			return []int64{}, nil
+		},
+	}
+
+	generator := NewGenerator(mockCalculator)
+
+	result, err := generator.GetPrimeAtIndex(context.Background(), int64(100))
+	require.Error(t, err)
+	assert.Equal(t, int64(-1), result)
+	assert.Contains(t, err.Error(), "no more primes available")
+
 }
 
 func FuzzEratosthenesCalculator_GetPrimeAtIndex(f *testing.F) {
@@ -78,10 +94,13 @@ func FuzzEratosthenesCalculator_GetPrimeAtIndex(f *testing.F) {
 	f.Fuzz(func(t *testing.T, n int64) {
 		result, err := generator.GetPrimeAtIndex(context.Background(), n)
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !big.NewInt(result).ProbablyPrime(0) {
-			t.Errorf("the generators produced a non-prime number at index %d", n)
+			if !strings.Contains(err.Error(), "index must be a positive number") {
+				t.Errorf("unexpected error: %v", err)
+			}
+		} else {
+			if !big.NewInt(result).ProbablyPrime(0) {
+				t.Errorf("the generators produced a non-prime number at index %d", n)
+			}
 		}
 	})
 }

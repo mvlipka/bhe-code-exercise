@@ -15,6 +15,7 @@ type Generator struct {
 	calculator calculators.Calculator
 }
 
+// NewGenerator returns a new generator
 func NewGenerator(calculator calculators.Calculator) *Generator {
 	return &Generator{
 		primes:     make([]int64, 0),
@@ -22,60 +23,47 @@ func NewGenerator(calculator calculators.Calculator) *Generator {
 	}
 }
 
+// GetPrimeAtIndex generates primes until there are enough primes to satisfy the index requirement
+// This method caches the resulting primes. If the cache contains the index, it will simply return the prime in cache
+// rather than re-calculate.
 func (g *Generator) GetPrimeAtIndex(ctx context.Context, index int64) (int64, error) {
-	// Primes must be positive
+	// Index must be a positive number
 	if index < 0 {
-		return 0, errors.New("index must be a positive number")
+		return -1, errors.New("index must be a positive number")
 	}
 
-	if g.primes == nil || len(g.primes) == 0 {
-		g.primes = []int64{}
-	}
-
-	// Return the prime at index if it's cached
+	// Check cache for the index and return it if it's found
 	if index < int64(len(g.primes)) {
 		return g.primes[index], nil
 	}
 
-	// Clear our cache to regenerate if the index was missed
-	g.primes = make([]int64, 0)
+	start := int64(2)
 
-	doneChan := make(chan error)
-	var result int64
-
-	go func() {
-		start := int64(2)
-		end := start + int64(1000)
-
-		// Generate primes until we have a prime slice with an index that satisfies the caller's index
-		for {
-			newPrimes, err := g.calculator.GeneratePrimesInRange(start, end)
-			if err != nil {
-				doneChan <- fmt.Errorf("error generating primes in range: %w", err)
-			}
-
-			g.primes = append(g.primes, newPrimes...)
-
-			// We found our prime
-			if int64(len(g.primes)) > index {
-				result = g.primes[index]
-				break
-			}
-
-			start = end + 1
-			end = start + 1000
-		}
-
-		doneChan <- nil
-	}()
-
-	// Block until primes are generated or the context timeout has exceeded
-	select {
-	case <-ctx.Done():
-		return -1, errors.New("context timeout exceeded")
-	case <-doneChan:
-		break
+	// Start from our last known prime+1, if a cached prime exists
+	if len(g.primes) > 0 {
+		start = g.primes[len(g.primes)-1] + 1
 	}
 
-	return result, nil
+	// Generate until we reach the index requirement
+	for int64(len(g.primes)) <= index {
+		if err := ctx.Err(); err != nil {
+			return -1, fmt.Errorf("context timeout exceeded")
+		}
+
+		// Generate primes from start to start + 1000
+		newPrimes, err := g.calculator.GeneratePrimesInRange(start, start+1000)
+		if err != nil {
+			return -1, err
+		}
+
+		// If we failed to generate new primes, there may be a problem with our range
+		if len(newPrimes) == 0 {
+			return -1, fmt.Errorf("no more primes available up to %d", start+1000)
+		}
+
+		g.primes = append(g.primes, newPrimes...)
+		start += 1001
+	}
+
+	return g.primes[index], nil
 }

@@ -18,6 +18,7 @@ func NewEratosthenesCalculator() *EratosthenesCalculator {
 	return &EratosthenesCalculator{}
 }
 
+// GeneratePrimesInRange given a range delineated by start & end, gather all prime numbers within the range
 func (e *EratosthenesCalculator) GeneratePrimesInRange(start, end int64) ([]int64, error) {
 	if start <= 0 {
 		return nil, errors.New("error start of range must be positive")
@@ -51,6 +52,7 @@ func (e *EratosthenesCalculator) sieve(max int64) []int64 {
 	return primes
 }
 
+// segmentedSieve a slight tweak to the classic Sieve of Eratosthenes in which we can reduce the memory usage when generating for large primes
 func (e *EratosthenesCalculator) segmentedSieve(low, high int64) []int64 {
 	root := int64(math.Sqrt(float64(high)))
 	primes := e.sieve(root)
