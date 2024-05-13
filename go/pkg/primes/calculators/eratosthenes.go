@@ -1,9 +1,8 @@
 package calculators
 
 import (
-	"context"
 	"errors"
-	"slices"
+	"math"
 )
 
 var _ Calculator = &EratosthenesCalculator{}
@@ -12,109 +11,72 @@ var _ Calculator = &EratosthenesCalculator{}
 // The calculator stores a cache of calculated prime numbers. Accessing an already existing number will pull from the cache
 // More information on the algorithm can be found on Wikipedia: https://en.wikipedia.org/wiki/Sieve_of_Eratosthenes
 type EratosthenesCalculator struct {
-	primes  []int64
-	markers []bool
 }
 
 // NewEratosthenesCalculator returns a new EratosthenesCalculator
 func NewEratosthenesCalculator() *EratosthenesCalculator {
-	return &EratosthenesCalculator{
-		primes: []int64{2},
-	}
+	return &EratosthenesCalculator{}
 }
 
-// GetPrimeAtIndex returns a prime at a given index where index 0 is the first prime number
-// This operation may be expensive if a large index is selected
-// ctx may be used to set a timeout or deadline
-func (e *EratosthenesCalculator) GetPrimeAtIndex(ctx context.Context, index int64) (int64, error) {
-
-	// Primes must be positive
-	if index < 0 {
-		return 0, errors.New("index must be a positive number")
+func (e *EratosthenesCalculator) GeneratePrimesInRange(start, end int64) ([]int64, error) {
+	if start <= 0 {
+		return nil, errors.New("error start of range must be positive")
 	}
 
-	if e.primes == nil {
-		e.primes = []int64{2}
+	if start > end {
+		return nil, errors.New("error start of range must be less than end of range")
 	}
 
-	primeNumbers := slices.Clone(e.primes)
-
-	// Return the prime at index if it's cached
-	if index < int64(len(primeNumbers)) {
-		return primeNumbers[index], nil
-	}
-
-	doneChan := make(chan bool)
-	var result int64
-
-	go func() {
-		start := primeNumbers[len(primeNumbers)-1] + 1
-		end := start + 1000
-
-		// Generate primes until we have a prime with an index that satisfies the caller's index
-		for {
-			newPrimes := e.generatePrimesInRange(start, end)
-			primeNumbers = append(primeNumbers, newPrimes...)
-
-			// We found our prime
-			if int64(len(primeNumbers)) >= index {
-				result = primeNumbers[index]
-				break
-			}
-
-			start = end
-			end += 1000
-		}
-
-		doneChan <- true
-	}()
-
-	// Block until primes are generated or the context timeout has exceeded
-	select {
-	case <-ctx.Done():
-		return -1, errors.New("context timeout exceeded")
-	case <-doneChan:
-		break
-	}
-
-	e.primes = primeNumbers
-
-	return result, nil
+	return e.segmentedSieve(start, end), nil
 }
 
-func (e *EratosthenesCalculator) generatePrimesInRange(start, end int64) []int64 {
-	newPrimes := make([]int64, 0)
-	markers := make([]bool, end+1)
-
-	// Iterate through the numbers from start to end
-	for i := start; i <= end; i++ {
-		if markers[i] == true {
-			continue
-		}
-
-		// Check if the current number is a multiple of any known primes
-		isPrime := true
-		for _, prime := range append(e.primes, newPrimes...) {
-			if i%prime == 0 {
-				isPrime = false
-				break
-			}
-		}
-
-		if isPrime == false {
-			markers[i] = true
-			continue
-		}
-
-		// Mark any multiples of the current prime until the end of the segment
-		for j := i * i; j < end; j++ {
-			if j%i == 0 {
-				markers[j] = true
-			}
-		}
-
-		newPrimes = append(newPrimes, i)
+// sieve computes all prime numbers up to max using the classic Sieve of Eratosthenes algorithm
+func (e *EratosthenesCalculator) sieve(max int64) []int64 {
+	isPrime := make([]bool, max+1)
+	for i := int64(2); i <= max; i++ {
+		isPrime[i] = true
 	}
 
-	return newPrimes
+	primeNumberEstimate := int64(float64(max) / math.Log(float64(max)))
+	primes := make([]int64, 0, primeNumberEstimate)
+	for i := int64(2); i <= max; i++ {
+		if isPrime[i] {
+			primes = append(primes, i)
+			for j := i * i; j <= max; j += i {
+				isPrime[j] = false
+			}
+		}
+	}
+
+	return primes
+}
+
+func (e *EratosthenesCalculator) segmentedSieve(low, high int64) []int64 {
+	root := int64(math.Sqrt(float64(high)))
+	primes := e.sieve(root)
+
+	segmentSize := high - low + 1
+	isPrime := make([]bool, segmentSize)
+	for i := range isPrime {
+		isPrime[i] = true
+	}
+
+	for _, prime := range primes {
+		smallestMultiple := prime * prime
+		if smallestMultiple < low {
+			smallestMultiple = ((low + prime - 1) / prime) * prime
+		}
+
+		for multiple := smallestMultiple; multiple <= high; multiple += prime {
+			isPrime[multiple-low] = false
+		}
+	}
+
+	primeNumbers := make([]int64, 0)
+	for i, prime := range isPrime {
+		if prime {
+			primeNumbers = append(primeNumbers, low+int64(i))
+		}
+	}
+	return primeNumbers
 }
