@@ -11,22 +11,20 @@ import (
 // Primes will be cached upon generation for later use, if the prime can not be found
 // then the prime cache will become invalidated and re-generated
 type Generator struct {
-	primes     []int64
-	calculator calculators.Calculator
+	primes []int64
 }
 
 // NewGenerator returns a new generator
-func NewGenerator(calculator calculators.Calculator) *Generator {
+func NewGenerator() *Generator {
 	return &Generator{
-		primes:     make([]int64, 0),
-		calculator: calculator,
+		primes: make([]int64, 0),
 	}
 }
 
 // GetPrimeAtIndex generates primes until there are enough primes to satisfy the index requirement
 // This method caches the resulting primes. If the cache contains the index, it will simply return the prime in cache
 // rather than re-calculate.
-func (g *Generator) GetPrimeAtIndex(ctx context.Context, index int64) (int64, error) {
+func (g *Generator) GetPrimeAtIndex(ctx context.Context, index int64, calculator calculators.Calculator) (int64, error) {
 	// Index must be a positive number
 	if index < 0 {
 		return -1, errors.New("index must be a positive number")
@@ -51,7 +49,7 @@ func (g *Generator) GetPrimeAtIndex(ctx context.Context, index int64) (int64, er
 		}
 
 		// Generate primes from start to start + 1000
-		newPrimes, err := g.calculator.GeneratePrimesInRange(start, start+1000)
+		newPrimes, err := calculator.GeneratePrimesInRange(start, start+1000)
 		if err != nil {
 			return -1, err
 		}

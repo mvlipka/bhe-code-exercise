@@ -21,6 +21,8 @@ func main() {
 	switch *calculatorFlag {
 	case "eratosthenes":
 		calculator = calculators.NewEratosthenesCalculator()
+	default:
+		calculator = calculators.NewEratosthenesCalculator()
 	}
 
 	ctx := context.Background()
@@ -30,9 +32,9 @@ func main() {
 		defer cancel()
 	}
 
-	generator := primes.NewGenerator(calculator)
+	generator := primes.NewGenerator()
 
-	result, err := generator.GetPrimeAtIndex(ctx, *indexFlag)
+	result, err := generator.GetPrimeAtIndex(ctx, *indexFlag, calculator)
 	if err != nil {
 		log.Fatalln(err)
 	}
