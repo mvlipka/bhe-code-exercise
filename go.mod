@@ -1,4 +1,4 @@
-module ssse-exercise-sieve
+module github.com/mvlipka/bhe-code-exercise
 
 go 1.19
 
